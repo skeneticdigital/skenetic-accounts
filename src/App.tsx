@@ -95,8 +95,8 @@ export default function App() {
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0 });
 
   // Auth States
-  const [loginEmail, setLoginEmail] = useState('info@skeneticdigital.com');
-  const [loginPassword, setLoginPassword] = useState('admin123');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -375,10 +375,7 @@ export default function App() {
             </button>
           </form>
           
-          <div className="mt-6 text-center text-sm text-zinc-500">
-            <p>Demo Credentials:</p>
-            <p className="font-mono">info@skeneticdigital.com / admin123</p>
-          </div>
+
         </motion.div>
       </div>
     );
