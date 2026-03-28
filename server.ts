@@ -23,9 +23,11 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
   ssl: {
     minVersion: 'TLSv1.2',
-    rejectUnauthorized: true
+    rejectUnauthorized: false
   }
 });
 
@@ -79,7 +81,8 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   const upload = multer({ dest: 'uploads/' });
 
@@ -88,10 +91,10 @@ async function startServer() {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) return res.sendStatus(401);
+    if (!token) return res.status(401).json({ message: 'No token provided' });
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-      if (err) return res.sendStatus(403);
+      if (err) return res.status(403).json({ message: 'Session expired or invalid' });
       req.user = user;
       next();
     });
@@ -130,11 +133,14 @@ async function startServer() {
   app.post('/api/income', authenticateToken, async (req: any, res) => {
     try {
       const { date, source, amount, notes } = req.body;
+      if (!date || !source || amount === undefined) {
+        return res.status(400).json({ message: 'Date, Source, and Amount are required' });
+      }
       const [result]: any = await pool.execute('INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)', [req.user.id, date, source, amount, notes]);
       res.json({ id: result.insertId });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server error' });
+      console.error('Error saving income:', error);
+      res.status(500).json({ message: 'Server error saving income' });
     }
   });
 
@@ -174,11 +180,14 @@ async function startServer() {
   app.post('/api/expenses', authenticateToken, async (req: any, res) => {
     try {
       const { date, category, amount, description } = req.body;
+      if (!date || !category || amount === undefined) {
+        return res.status(400).json({ message: 'Date, Category, and Amount are required' });
+      }
       const [result]: any = await pool.execute('INSERT INTO expenses (userId, date, category, amount, description) VALUES (?, ?, ?, ?, ?)', [req.user.id, date, category, amount, description]);
       res.json({ id: result.insertId });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server error' });
+      console.error('Error saving expense:', error);
+      res.status(500).json({ message: 'Server error saving expense' });
     }
   });
 
@@ -217,20 +226,50 @@ async function startServer() {
       
       const { type, data } = req.body;
       
+      let successCount = 0;
       for (const item of data) {
-        if (type === 'income') {
-          await connection.execute('INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)', [req.user.id, item.date, item.source, item.amount, item.notes]);
-        } else {
-          await connection.execute('INSERT INTO expenses (userId, date, category, amount, description) VALUES (?, ?, ?, ?, ?)', [req.user.id, item.date, item.category, item.amount, item.description]);
+        try {
+          // Robust date parsing (Handles DD.MM.YYYY, DD/MM/YYYY, etc.)
+          let normalizedDate = item.date;
+          if (normalizedDate && (normalizedDate.includes('.') || normalizedDate.includes('/'))) {
+            const separator = normalizedDate.includes('.') ? '.' : '/';
+            const parts = normalizedDate.split(separator);
+            if (parts.length === 3) {
+              // Assume DD.MM.YYYY if parts[2] is length 4
+              if (parts[2].length === 4) {
+                normalizedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              } else if (parts[0].length === 4) {
+                // Already YYYY.MM.DD
+                normalizedDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+              }
+            }
+          }
+          
+          const amount = parseFloat(item.amount);
+          if (type === 'income') {
+            await connection.execute(
+              'INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)', 
+              [req.user.id, normalizedDate || new Date().toISOString().split('T')[0], item.source || 'Unknown', amount || 0, item.notes || '']
+            );
+          } else {
+            await connection.execute(
+              'INSERT INTO expenses (userId, date, category, amount, description) VALUES (?, ?, ?, ?, ?)', 
+              [req.user.id, normalizedDate || new Date().toISOString().split('T')[0], item.category || 'Miscellaneous', amount || 0, item.description || '']
+            );
+          }
+          successCount++;
+        } catch (rowError) {
+          console.error(`Row insertion failed for ${type}:`, item, rowError);
+          throw new Error(`Failed at record #${successCount + 1}: ${rowError instanceof Error ? rowError.message : String(rowError)}`);
         }
       }
 
       await connection.commit();
-      res.json({ message: 'Bulk insert successful' });
+      res.json({ message: `Successfully uploaded ${successCount} records` });
     } catch (error) {
       await connection.rollback();
       console.error('Bulk insert failed:', error);
-      res.status(500).json({ message: 'Bulk insert failed' });
+      res.status(500).json({ message: 'Bulk insert failed: ' + (error instanceof Error ? error.message : String(error)) });
     } finally {
       connection.release();
     }

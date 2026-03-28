@@ -118,23 +118,28 @@ export default function App() {
     let fIncome = [...income];
     let fExpense = [...expenses];
 
+    const isValidDate = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return !isNaN(d.getTime());
+    };
+
     if (filterMonth !== 'All') {
       const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       const monthIndex = monthNames.indexOf(filterMonth);
-      fIncome = fIncome.filter(i => new Date(i.date).getMonth() === monthIndex);
-      fExpense = fExpense.filter(e => new Date(e.date).getMonth() === monthIndex);
+      fIncome = fIncome.filter(i => isValidDate(i.date) && new Date(i.date).getMonth() === monthIndex);
+      fExpense = fExpense.filter(e => isValidDate(e.date) && new Date(e.date).getMonth() === monthIndex);
     }
 
     if (filterYear !== 'All') {
-      fIncome = fIncome.filter(i => new Date(i.date).getFullYear().toString() === filterYear);
-      fExpense = fExpense.filter(e => new Date(e.date).getFullYear().toString() === filterYear);
+      fIncome = fIncome.filter(i => isValidDate(i.date) && new Date(i.date).getFullYear().toString() === filterYear);
+      fExpense = fExpense.filter(e => isValidDate(e.date) && new Date(e.date).getFullYear().toString() === filterYear);
     }
 
     setFilteredIncome(fIncome);
     setFilteredExpenses(fExpense);
     
-    const totalInc = fIncome.reduce((acc, curr) => acc + curr.amount, 0);
-    const totalExp = fExpense.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalInc = fIncome.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+    const totalExp = fExpense.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
     setFilteredSummary({
       totalIncome: totalInc,
       totalExpenses: totalExp,
@@ -167,14 +172,25 @@ export default function App() {
       ]);
 
       if (incomeRes.ok && expenseRes.ok && summaryRes.ok) {
-        setIncome(await incomeRes.json());
-        setExpenses(await expenseRes.json());
-        setSummary(await summaryRes.json());
+        const incomeData = await incomeRes.json();
+        const expenseData = await expenseRes.json();
+        const summaryData = await summaryRes.json();
+
+        // Ensure amounts are numbers
+        setIncome(incomeData.map((i: any) => ({ ...i, amount: Number(i.amount) })));
+        setExpenses(expenseData.map((e: any) => ({ ...e, amount: Number(e.amount) })));
+        setSummary({
+          totalIncome: Number(summaryData.totalIncome),
+          totalExpenses: Number(summaryData.totalExpenses),
+          balance: Number(summaryData.balance)
+        });
       } else if (incomeRes.status === 401) {
         handleLogout();
+      } else {
+        setError('Failed to fetch data');
       }
     } catch (err) {
-      setError('Failed to fetch data');
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setIsLoading(false);
     }
@@ -213,15 +229,24 @@ export default function App() {
 
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
     const formData = new FormData(e.target as HTMLFormElement);
     const data = Object.fromEntries(formData.entries());
     
     // Convert amount to number correctly for the database
     if (data.amount) {
-      data.amount = parseFloat(data.amount as string) as any;
+      const parsedAmount = parseFloat(data.amount as string);
+      if (isNaN(parsedAmount)) {
+        setError("Invalid amount format.");
+        setIsLoading(false);
+        return;
+      }
+      data.amount = parsedAmount as any;
     }
     
-    const url = modalType === 'income' ? '/api/income' : '/api/expenses';
+    const url = (modalType === 'income' || modalType === 'income') ? '/api/income' : '/api/expenses';
     const method = editingItem ? 'PUT' : 'POST';
     const body = editingItem ? { ...data, id: editingItem.id } : data;
 
@@ -239,9 +264,14 @@ export default function App() {
         setIsModalOpen(false);
         setEditingItem(null);
         fetchData();
+      } else {
+        const errData = await res.json();
+        setError(errData.message || 'Failed to save item');
       }
     } catch (err) {
-      setError('Failed to save item');
+      setError('Network error. Failed to save item');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -341,6 +371,7 @@ export default function App() {
 
   const handleBulkInsert = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/bulk-insert', {
         method: 'POST',
@@ -355,9 +386,28 @@ export default function App() {
         setUploadData([]);
         fetchData();
         setActiveTab('dashboard');
+        alert('Bulk upload successful!');
+      } else {
+        const contentType = res.headers.get('content-type');
+        let errorMessage = 'Failed to perform bulk insert';
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errData = await res.json();
+          errorMessage = errData.message || errorMessage;
+        } else {
+          errorMessage = await res.text();
+        }
+
+        if (res.status === 413) {
+          setError('File too large. Please upload a smaller CSV or increase server limits.');
+        } else if (res.status === 401 || res.status === 403) {
+          setError(`Session Error: ${errorMessage}. Please sign out and sign in again.`);
+        } else {
+          setError(`Upload Error: ${errorMessage}`);
+        }
       }
     } catch (err) {
-      setError('Failed to perform bulk insert');
+      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -623,7 +673,7 @@ export default function App() {
                 <h2 className="text-2xl font-bold capitalize">{activeTab} Management</h2>
                 <button 
                   onClick={() => {
-                    setModalType(activeTab as 'income' | 'expense');
+                    setModalType(activeTab.endsWith('s') ? activeTab.slice(0, -1) as 'income' | 'expense' : activeTab as 'income' | 'expense');
                     setEditingItem(null);
                     setIsModalOpen(true);
                   }}
@@ -673,7 +723,7 @@ export default function App() {
                               <button 
                                 onClick={() => {
                                   setEditingItem(item);
-                                  setModalType(activeTab as 'income' | 'expense');
+                                  setModalType(activeTab.endsWith('s') ? activeTab.slice(0, -1) as any : activeTab as any);
                                   setIsModalOpen(true);
                                 }}
                                 className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"
@@ -695,7 +745,7 @@ export default function App() {
                 </div>
 
                 <div className="mt-6 flex items-center justify-between">
-                  <p className="text-sm text-zinc-500">Showing 1 to 10 of 20 entries</p>
+                  <p className="text-sm text-zinc-500">Showing {Math.min(1, (activeTab === 'income' ? income : expenses).length)} to {(activeTab === 'income' ? income : expenses).length} of {(activeTab === 'income' ? income : expenses).length} entries</p>
                   <div className="flex gap-2">
                     <button className="p-2 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50">
                       <ChevronLeft size={16} />
@@ -826,6 +876,13 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
               <h2 className="text-2xl font-bold">Bulk Data Upload</h2>
               
+              {error && (
+                <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 text-sm flex items-center gap-2 border border-red-100 dark:border-red-900/20">
+                  <AlertCircle size={18} />
+                  {error}
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800">
                   <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full flex items-center justify-center mb-4">
@@ -922,6 +979,12 @@ export default function App() {
             title={editingItem ? `Edit ${modalType}` : `Add New ${modalType}`}
           >
             <form onSubmit={handleSaveItem} className="space-y-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  {error}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
                 <input 
@@ -980,7 +1043,7 @@ export default function App() {
                   type="submit"
                   className="flex-1 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium shadow-lg shadow-blue-500/20"
                 >
-                  {editingItem ? 'Update' : 'Save'} {modalType}
+                  {isLoading ? 'Saving...' : (editingItem ? 'Update' : 'Save')} {modalType}
                 </button>
               </div>
             </form>
