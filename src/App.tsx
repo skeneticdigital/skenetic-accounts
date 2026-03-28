@@ -184,7 +184,7 @@ export default function App() {
           totalExpenses: Number(summaryData.totalExpenses),
           balance: Number(summaryData.balance)
         });
-      } else if (incomeRes.status === 401) {
+      } else if (incomeRes.status === 401 || incomeRes.status === 403) {
         handleLogout();
       } else {
         setError('Failed to fetch data');
@@ -265,6 +265,10 @@ export default function App() {
         setEditingItem(null);
         fetchData();
       } else {
+        if (res.status === 401 || res.status === 403) {
+          handleLogout();
+          return;
+        }
         const errData = await res.json();
         setError(errData.message || 'Failed to save item');
       }
@@ -512,7 +516,10 @@ export default function App() {
             ].map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setError(null);
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                   activeTab === item.id 
@@ -675,6 +682,7 @@ export default function App() {
                   onClick={() => {
                     setModalType(activeTab.endsWith('s') ? activeTab.slice(0, -1) as 'income' | 'expense' : activeTab as 'income' | 'expense');
                     setEditingItem(null);
+                    setError(null);
                     setIsModalOpen(true);
                   }}
                   className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
@@ -724,6 +732,7 @@ export default function App() {
                                 onClick={() => {
                                   setEditingItem(item);
                                   setModalType(activeTab.endsWith('s') ? activeTab.slice(0, -1) as any : activeTab as any);
+                                  setError(null);
                                   setIsModalOpen(true);
                                 }}
                                 className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"

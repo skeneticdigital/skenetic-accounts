@@ -24,7 +24,7 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
+  keepAliveInitialDelay: 10000,
   ssl: {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: false
@@ -94,7 +94,10 @@ async function startServer() {
     if (!token) return res.status(401).json({ message: 'No token provided' });
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-      if (err) return res.status(403).json({ message: 'Session expired or invalid' });
+      if (err) {
+        console.error('JWT Verification Error:', err.message, err.name);
+        return res.status(401).json({ message: 'Session expired or invalid' });
+      }
       req.user = user;
       next();
     });
