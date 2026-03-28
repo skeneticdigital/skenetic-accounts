@@ -103,6 +103,45 @@ export default function App() {
   const [modalType, setModalType] = useState<'income' | 'expense'>('income');
   const [editingItem, setEditingItem] = useState<any>(null);
 
+  // Filter States
+  const [filterMonth, setFilterMonth] = useState('All');
+  const [filterYear, setFilterYear] = useState('2026');
+  const [filteredIncome, setFilteredIncome] = useState<Income[]>([]);
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [filteredSummary, setFilteredSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0 });
+
+  useEffect(() => {
+    applyFilters();
+  }, [income, expenses, filterMonth, filterYear]);
+
+  const applyFilters = () => {
+    let fIncome = [...income];
+    let fExpense = [...expenses];
+
+    if (filterMonth !== 'All') {
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthIndex = monthNames.indexOf(filterMonth);
+      fIncome = fIncome.filter(i => new Date(i.date).getMonth() === monthIndex);
+      fExpense = fExpense.filter(e => new Date(e.date).getMonth() === monthIndex);
+    }
+
+    if (filterYear !== 'All') {
+      fIncome = fIncome.filter(i => new Date(i.date).getFullYear().toString() === filterYear);
+      fExpense = fExpense.filter(e => new Date(e.date).getFullYear().toString() === filterYear);
+    }
+
+    setFilteredIncome(fIncome);
+    setFilteredExpenses(fExpense);
+    
+    const totalInc = fIncome.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalExp = fExpense.reduce((acc, curr) => acc + curr.amount, 0);
+    setFilteredSummary({
+      totalIncome: totalInc,
+      totalExpenses: totalExp,
+      balance: totalInc - totalExp
+    });
+  };
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -177,11 +216,14 @@ export default function App() {
     const formData = new FormData(e.target as HTMLFormElement);
     const data = Object.fromEntries(formData.entries());
     
-    const url = modalType === 'income' 
-      ? (editingItem ? `/api/income/${editingItem.id}` : '/api/income')
-      : (editingItem ? `/api/expenses/${editingItem.id}` : '/api/expenses');
+    // Convert amount to number correctly for the database
+    if (data.amount) {
+      data.amount = parseFloat(data.amount as string) as any;
+    }
     
+    const url = modalType === 'income' ? '/api/income' : '/api/expenses';
     const method = editingItem ? 'PUT' : 'POST';
+    const body = editingItem ? { ...data, id: editingItem.id } : data;
 
     try {
       const res = await fetch(url, {
@@ -190,7 +232,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(body)
       });
 
       if (res.ok) {
@@ -207,7 +249,7 @@ export default function App() {
     if (!confirm('Are you sure you want to delete this item?')) return;
     
     try {
-      const res = await fetch(`/api/${type === 'income' ? 'income' : 'expenses'}/${id}`, {
+      const res = await fetch(`/api/${type === 'income' ? 'income' : 'expenses'}?id=${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -689,21 +731,43 @@ export default function App() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs text-zinc-500 mb-1">Month</label>
-                      <select className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-transparent outline-none">
-                        <option>All Months</option>
+                      <select 
+                        value={filterMonth}
+                        onChange={(e) => setFilterMonth(e.target.value)}
+                        className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-transparent outline-none"
+                      >
+                        <option value="All">All Months</option>
                         <option>January</option>
                         <option>February</option>
                         <option>March</option>
+                        <option>April</option>
+                        <option>May</option>
+                        <option>June</option>
+                        <option>July</option>
+                        <option>August</option>
+                        <option>September</option>
+                        <option>October</option>
+                        <option>November</option>
+                        <option>December</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs text-zinc-500 mb-1">Year</label>
-                      <select className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-transparent outline-none">
+                      <select 
+                        value={filterYear}
+                        onChange={(e) => setFilterYear(e.target.value)}
+                        className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-transparent outline-none"
+                      >
+                        <option value="All">All Years</option>
                         <option>2026</option>
                         <option>2025</option>
+                        <option>2024</option>
                       </select>
                     </div>
-                    <button className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all">
+                    <button 
+                      onClick={applyFilters}
+                      className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium"
+                    >
                       Apply Filters
                     </button>
                   </div>
@@ -728,15 +792,15 @@ export default function App() {
                     <div className="grid grid-cols-3 gap-4 text-center">
                       <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl">
                         <p className="text-xs text-emerald-600 font-bold uppercase tracking-wider mb-1">Total Income</p>
-                        <p className="text-xl font-bold text-emerald-700">{formatCurrency(summary.totalIncome)}</p>
+                        <p className="text-xl font-bold text-emerald-700">{formatCurrency(filteredSummary.totalIncome)}</p>
                       </div>
                       <div className="p-4 bg-rose-50 dark:bg-rose-900/10 rounded-2xl">
                         <p className="text-xs text-rose-600 font-bold uppercase tracking-wider mb-1">Total Expense</p>
-                        <p className="text-xl font-bold text-rose-700">{formatCurrency(summary.totalExpenses)}</p>
+                        <p className="text-xl font-bold text-rose-700">{formatCurrency(filteredSummary.totalExpenses)}</p>
                       </div>
                       <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl">
-                        <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Net Profit</p>
-                        <p className="text-xl font-bold text-blue-700">{formatCurrency(summary.balance)}</p>
+                        <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Net Balance</p>
+                        <p className="text-xl font-bold text-blue-700">{formatCurrency(filteredSummary.balance)}</p>
                       </div>
                     </div>
 

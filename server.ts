@@ -138,10 +138,10 @@ async function startServer() {
     }
   });
 
-  app.put('/api/income/:id', authenticateToken, async (req: any, res) => {
+  app.put('/api/income', authenticateToken, async (req: any, res) => {
     try {
-      const { date, source, amount, notes } = req.body;
-      await pool.execute('UPDATE income SET date = ?, source = ?, amount = ?, notes = ? WHERE id = ? AND userId = ?', [date, source, amount, notes, req.params.id, req.user.id]);
+      const { id, date, source, amount, notes } = req.body;
+      await pool.execute('UPDATE income SET date = ?, source = ?, amount = ?, notes = ? WHERE id = ? AND userId = ?', [date, source, amount, notes, id, req.user.id]);
       res.json({ message: 'Updated' });
     } catch (error) {
       console.error(error);
@@ -149,9 +149,10 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/income/:id', authenticateToken, async (req: any, res) => {
+  app.delete('/api/income', authenticateToken, async (req: any, res) => {
     try {
-      await pool.execute('DELETE FROM income WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+      const { id } = req.query;
+      await pool.execute('DELETE FROM income WHERE id = ? AND userId = ?', [id, req.user.id]);
       res.json({ message: 'Deleted' });
     } catch (error) {
       console.error(error);
@@ -181,10 +182,10 @@ async function startServer() {
     }
   });
 
-  app.put('/api/expenses/:id', authenticateToken, async (req: any, res) => {
+  app.put('/api/expenses', authenticateToken, async (req: any, res) => {
     try {
-      const { date, category, amount, description } = req.body;
-      await pool.execute('UPDATE expenses SET date = ?, category = ?, amount = ?, description = ? WHERE id = ? AND userId = ?', [date, category, amount, description, req.params.id, req.user.id]);
+      const { id, date, category, amount, description } = req.body;
+      await pool.execute('UPDATE expenses SET date = ?, category = ?, amount = ?, description = ? WHERE id = ? AND userId = ?', [date, category, amount, description, id, req.user.id]);
       res.json({ message: 'Updated' });
     } catch (error) {
       console.error(error);
@@ -192,9 +193,10 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/expenses/:id', authenticateToken, async (req: any, res) => {
+  app.delete('/api/expenses', authenticateToken, async (req: any, res) => {
     try {
-      await pool.execute('DELETE FROM expenses WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+      const { id } = req.query;
+      await pool.execute('DELETE FROM expenses WHERE id = ? AND userId = ?', [id, req.user.id]);
       res.json({ message: 'Deleted' });
     } catch (error) {
       console.error(error);
