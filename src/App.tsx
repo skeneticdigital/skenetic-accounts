@@ -269,7 +269,12 @@ export default function App() {
           handleLogout();
           return;
         }
-        const errData = await res.json();
+        let errData;
+        try {
+          errData = await res.json();
+        } catch {
+          errData = { message: await res.text() || 'Failed to save item' };
+        }
         setError(errData.message || 'Failed to save item');
       }
     } catch (err) {

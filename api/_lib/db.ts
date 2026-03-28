@@ -11,6 +11,8 @@ const pool = mysql.createPool({
   database: process.env.TIDB_DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   ssl: {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: false

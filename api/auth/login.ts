@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import pool, { initDB } from '../_lib/db.js';
+import pool, { initDB } from '../_lib/db.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fintrack-secret-key';
 

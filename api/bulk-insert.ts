@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../_lib/db.js';
-import { verifyToken } from '../_lib/auth.js';
+import pool from '../_lib/db.ts';
+import { verifyToken } from '../_lib/auth.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = verifyToken(req);
