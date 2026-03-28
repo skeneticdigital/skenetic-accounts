@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../_lib/db.ts';
-import { verifyToken } from '../_lib/auth.ts';
+import pool from '../_lib/db.js';
+import { verifyToken } from '../_lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = verifyToken(req);
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
-  if (req.method !== 'POST') {
+  if (req.method === 'OPTIONS') return res.status(200).end(); if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 

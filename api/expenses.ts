@@ -1,13 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../_lib/db.ts';
-import { verifyToken } from '../_lib/auth.ts';
+import pool from '../_lib/db.js';
+import { verifyToken } from '../_lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = verifyToken(req);
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
   try {
-    if (req.method === 'GET') {
+    if (req.method === 'OPTIONS') return res.status(200).end(); if (req.method === 'GET') {
       const [expenses] = await pool.execute('SELECT * FROM expenses WHERE userId = ? ORDER BY date DESC', [user.id]);
       return res.json(expenses);
     }

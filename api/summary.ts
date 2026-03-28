@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../_lib/db.ts';
-import { verifyToken } from '../_lib/auth.ts';
+import pool from '../_lib/db.js';
+import { verifyToken } from '../_lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ message: 'Method not allowed' });

@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import pool, { initDB } from '../_lib/db.ts';
+import pool, { initDB } from '../_lib/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fintrack-secret-key';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
+  if (req.method === 'OPTIONS') return res.status(200).end(); if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
   try {
     await initDB();
