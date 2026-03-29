@@ -24,8 +24,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (Object.values(item).every(val => !val)) continue;
 
       // --- Flexible Field Mapping ---
-      // Date
-      let normalizedDate = item.date || item.Date || item.DATE;
+      // Date: Look for Date, Data, etc.
+      let normalizedDate = item.date || item.Date || item.DATE || item.Data || item.data || item.DATA;
       if (normalizedDate && (normalizedDate.includes('.') || normalizedDate.includes('/'))) {
         const separator = normalizedDate.includes('.') ? '.' : '/';
         const parts = normalizedDate.split(separator);
@@ -48,15 +48,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Notes / Description
       const notesOrDesc = item.notes || item.Notes || item.description || item.Description || item.memo || '';
 
+      // Fallbacks to null to prevent "undefined" error in bind parameters
+      const sqlDate = normalizedDate || null;
+      const sqlSource = sourceOrCategory || null;
+      const sqlAmount = isNaN(cleanAmount) ? 0 : cleanAmount;
+      const sqlNotes = notesOrDesc || null;
+
       if (type === 'income') {
         await connection.execute(
           'INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)',
-          [user.id, normalizedDate, sourceOrCategory, cleanAmount, notesOrDesc]
+          [user.id, sqlDate, sqlSource, sqlAmount, sqlNotes]
         );
       } else if (type === 'expense') {
         await connection.execute(
           'INSERT INTO expenses (userId, date, category, amount, description) VALUES (?, ?, ?, ?, ?)',
-          [user.id, normalizedDate, sourceOrCategory, cleanAmount, notesOrDesc]
+          [user.id, sqlDate, sqlSource, sqlAmount, sqlNotes]
         );
       }
     }
