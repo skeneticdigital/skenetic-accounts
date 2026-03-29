@@ -10,10 +10,12 @@ const pool = mysql.createPool({
   password: process.env.TIDB_PASSWORD,
   database: process.env.TIDB_DATABASE,
   waitForConnections: true,
-  connectionLimit: 1, // Reduced for serverless environment
-  maxIdle: 1, 
+  connectionLimit: 10,
+  maxIdle: 10,
+  idleTimeout: 60000, // 1 minute
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
+  connectTimeout: 10000, // 10 seconds
   ssl: {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: false

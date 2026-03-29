@@ -48,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Notes / Description
       const notesOrDesc = item.notes || item.Notes || item.description || item.Description || item.memo || '';
 
-      // --- Database Insertion ---
       if (type === 'income') {
         await connection.execute(
           'INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)',
@@ -65,10 +64,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await connection.commit();
     res.json({ message: `Successfully uploaded ${data.length} records` });
   } catch (error) {
-    await connection.rollback();
+    if (connection) await connection.rollback();
     console.error('Bulk insert error:', error);
     res.status(500).json({ message: error instanceof Error ? error.message : 'Database error during bulk upload' });
   } finally {
-    connection.release();
+    if (connection) connection.release();
   }
 }

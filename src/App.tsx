@@ -93,6 +93,7 @@ export default function App() {
   const [income, setIncome] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0 });
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // Auth States
   const [loginEmail, setLoginEmail] = useState('');
@@ -287,6 +288,48 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} items?`)) return;
+
+    setIsLoading(true);
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      };
+      
+      const endpoint = activeTab === 'income' ? '/api/income' : '/api/expenses';
+      
+      await Promise.all(selectedIds.map(id => 
+        fetch(`${endpoint}?id=${id}`, { method: 'DELETE', headers })
+      ));
+
+      setSelectedIds([]);
+      fetchData();
+      alert('Selected items deleted successfully');
+    } catch (err) {
+      setError('Failed to delete selected items');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    const currentData = activeTab === 'income' ? income : expenses;
+    if (selectedIds.length === currentData.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(currentData.map((item: any) => item.id));
+    }
+  };
+
+  const toggleSelectItem = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
   const handleDeleteItem = async (type: 'income' | 'expense', id: number) => {
@@ -703,7 +746,7 @@ export default function App() {
               </div>
 
               <Card>
-                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                  <div className="flex flex-col md:flex-row gap-4 mb-6">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
                     <input 
@@ -712,16 +755,40 @@ export default function App() {
                       className="w-full pl-10 pr-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-transparent outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <button className="flex items-center gap-2 px-4 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                    <Filter size={18} />
-                    Filter
-                  </button>
+                  <div className="flex gap-2">
+                    <AnimatePresence>
+                      {selectedIds.length > 0 && (
+                        <motion.button
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          onClick={handleBulkDelete}
+                          className="flex items-center gap-2 px-4 py-2 bg-rose-50 dark:bg-rose-900/10 text-rose-600 rounded-xl border border-rose-100 dark:border-rose-900/20 hover:bg-rose-100 transition-all font-medium"
+                        >
+                          <Trash2 size={18} />
+                          Delete ({selectedIds.length})
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                    <button className="flex items-center gap-2 px-4 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
+                      <Filter size={18} />
+                      Filter
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                    <table className="w-full text-left">
                     <thead>
                       <tr className="text-sm text-zinc-500 border-b border-zinc-100 dark:border-zinc-800">
+                        <th className="pb-4 font-medium w-10">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedIds.length > 0 && selectedIds.length === (activeTab === 'income' ? income : expenses).length}
+                            onChange={toggleSelectAll}
+                            className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </th>
                         <th className="pb-4 font-medium">Date</th>
                         <th className="pb-4 font-medium">{activeTab === 'income' ? 'Source' : 'Category'}</th>
                         <th className="pb-4 font-medium">Amount</th>
@@ -731,13 +798,24 @@ export default function App() {
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {(activeTab === 'income' ? income : expenses).map((item: any) => (
-                        <tr key={item.id} className="text-sm group hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                        <tr key={item.id} className={cn(
+                          "text-sm group transition-colors",
+                          selectedIds.includes(item.id) ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                        )}>
+                          <td className="py-4">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedIds.includes(item.id)}
+                              onChange={() => toggleSelectItem(item.id)}
+                              className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </td>
                           <td className="py-4">{formatDate(item.date)}</td>
                           <td className="py-4 font-medium">{item.source || item.category}</td>
                           <td className="py-4 font-semibold text-blue-600">{formatCurrency(item.amount)}</td>
                           <td className="py-4 text-zinc-500 max-w-xs truncate">{item.notes || item.description}</td>
                           <td className="py-4 text-right">
-                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex justify-end gap-2 transition-opacity">
                               <button 
                                 onClick={() => {
                                   setEditingItem(item);
