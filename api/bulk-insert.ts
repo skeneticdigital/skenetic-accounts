@@ -21,15 +21,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await connection.beginTransaction();
 
     for (const item of data) {
+      // Robust date parsing (Handles DD.MM.YYYY, DD/MM/YYYY, etc.)
+      let normalizedDate = item.date;
+      if (normalizedDate && (normalizedDate.includes('.') || normalizedDate.includes('/'))) {
+        const separator = normalizedDate.includes('.') ? '.' : '/';
+        const parts = normalizedDate.split(separator);
+        if (parts.length === 3) {
+          if (parts[2].length === 4) {
+            normalizedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          } else if (parts[0].length === 4) {
+            normalizedDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+          }
+        }
+      }
+
       if (type === 'income') {
         await connection.execute(
           'INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)',
-          [user.id, item.date, item.source, parseFloat(item.amount), item.notes || '']
+          [user.id, normalizedDate || item.date, item.source, parseFloat(item.amount), item.notes || '']
         );
       } else if (type === 'expense') {
         await connection.execute(
           'INSERT INTO expenses (userId, date, category, amount, description) VALUES (?, ?, ?, ?, ?)',
-          [user.id, item.date, item.category, parseFloat(item.amount), item.description || '']
+          [user.id, normalizedDate || item.date, item.category, parseFloat(item.amount), item.description || '']
         );
       }
     }

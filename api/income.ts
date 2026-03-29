@@ -14,6 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'POST') {
       const { date, source, amount, notes } = req.body;
+      if (!date || !source || amount === undefined) {
+        return res.status(400).json({ message: 'Date, Source, and Amount are required' });
+      }
       const [result]: any = await pool.execute(
         'INSERT INTO income (userId, date, source, amount, notes) VALUES (?, ?, ?, ?, ?)',
         [user.id, date, source, amount, notes]
