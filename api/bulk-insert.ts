@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../_lib/db.js';
+import pool, { initDB } from '../_lib/db.js';
 import { verifyToken } from '../_lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const connection = await pool.getConnection();
   try {
+    await initDB();
     await connection.beginTransaction();
 
     for (const item of data) {
@@ -53,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     await connection.rollback();
     console.error('Bulk insert error:', error);
-    res.status(500).json({ message: 'Failed to perform bulk insert' });
+    res.status(500).json({ message: error instanceof Error ? error.message : 'Failed to perform bulk insert' });
   } finally {
     connection.release();
   }

@@ -269,16 +269,21 @@ export default function App() {
           handleLogout();
           return;
         }
-        let errData;
+        let errorMessage = 'Failed to save item';
         try {
-          errData = await res.json();
-        } catch {
-          errData = { message: await res.text() || 'Failed to save item' };
+          const errData = await res.json();
+          errorMessage = errData.message || errorMessage;
+        } catch (e) {
+          const textError = await res.text();
+          console.error('Server error response:', textError);
+          errorMessage = textError.substring(0, 100) || errorMessage;
         }
-        setError(errData.message || 'Failed to save item');
+        setError(errorMessage);
+        console.error(`Save error (${res.status}):`, errorMessage);
       }
     } catch (err) {
-      setError('Network error. Failed to save item');
+      console.error('Fetch error:', err);
+      setError(`Network error: ${err instanceof Error ? err.message : 'Failed to save item'}`);
     } finally {
       setIsLoading(false);
     }

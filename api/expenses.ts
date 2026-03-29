@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../_lib/db.js';
+import pool, { initDB } from '../_lib/db.js';
 import { verifyToken } from '../_lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -7,7 +7,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
   try {
-    if (req.method === 'OPTIONS') return res.status(200).end(); if (req.method === 'GET') {
+    await initDB();
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    if (req.method === 'GET') {
       const [expenses] = await pool.execute('SELECT * FROM expenses WHERE userId = ? ORDER BY date DESC', [user.id]);
       return res.json(expenses);
     }
@@ -41,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(405).json({ message: 'Method not allowed' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('API Error (expenses):', error);
+    res.status(500).json({ message: error instanceof Error ? error.message : 'Server error' });
   }
 }
