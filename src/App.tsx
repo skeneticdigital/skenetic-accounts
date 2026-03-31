@@ -414,16 +414,37 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        setUploadData(results.data);
-      },
-      error: (err) => {
-        setError('Failed to parse CSV file');
-      }
-    });
+    const fileName = file.name.toLowerCase();
+    
+    if (fileName.endsWith('.csv')) {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          setUploadData(results.data);
+        },
+        error: (err) => {
+          setError('Failed to parse CSV file');
+        }
+      });
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const bstr = evt.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws);
+          setUploadData(data);
+        } catch (err) {
+          setError('Failed to parse Excel file');
+        }
+      };
+      reader.readAsBinaryString(file);
+    } else {
+      setError('Unsupported file format. Please upload CSV or Excel files.');
+    }
   };
 
   const handleBulkInsert = async () => {
@@ -1000,7 +1021,7 @@ export default function App() {
                     </select>
                     <label className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all cursor-pointer shadow-lg shadow-blue-500/20">
                       Browse Files
-                      <input type="file" className="hidden" accept=".csv" onChange={handleFileUpload} />
+                      <input type="file" className="hidden" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} />
                     </label>
                   </div>
                 </Card>
@@ -1010,11 +1031,11 @@ export default function App() {
                   <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
                     <div className="flex gap-3">
                       <div className="w-6 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xs font-bold shrink-0">1</div>
-                      <p>Ensure your CSV has headers: <strong>date, source, amount, notes</strong> (for Income) or <strong>date, category, amount, description</strong> (for Expenses).</p>
+                      <p>Ensure your sheet has headers like <strong>date, particulars, amount, remarks</strong> or <strong>date, category, amount, description</strong>.</p>
                     </div>
                     <div className="flex gap-3">
                       <div className="w-6 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xs font-bold shrink-0">2</div>
-                      <p>Date format should be YYYY-MM-DD.</p>
+                      <p>Date formats like DD-MM-YYYY, DD/MM/YYYY, and YYYY-MM-DD are supported. Amount can include currency symbols.</p>
                     </div>
                     <div className="flex gap-3">
                       <div className="w-6 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xs font-bold shrink-0">3</div>

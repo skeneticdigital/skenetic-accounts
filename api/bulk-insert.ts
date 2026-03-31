@@ -24,10 +24,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (Object.values(item).every(val => !val)) continue;
 
       // --- Flexible Field Mapping ---
-      // Date: Look for Date, Data, etc.
+      // Date: Look for variations of Date
       let normalizedDate = item.date || item.Date || item.DATE || item.Data || item.data || item.DATA;
-      if (normalizedDate && (normalizedDate.includes('.') || normalizedDate.includes('/'))) {
-        const separator = normalizedDate.includes('.') ? '.' : '/';
+      if (normalizedDate && typeof normalizedDate === 'string' && (normalizedDate.includes('.') || normalizedDate.includes('/') || normalizedDate.includes('-'))) {
+        const separator = normalizedDate.includes('.') ? '.' : (normalizedDate.includes('/') ? '/' : '-');
         const parts = normalizedDate.split(separator);
         if (parts.length === 3) {
           if (parts[2].length === 4) { // DD.MM.YYYY
@@ -38,15 +38,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Amount: Remove currency symbols and commas before parsing
-      const rawAmount = String(item.amount || item.Amount || item.AMOUNT || '0');
-      const cleanAmount = parseFloat(rawAmount.replace(/[^0-9.-]/g, '')) || 0;
+      // Amount: Handle currency symbols, commas, and various column names
+      const rawAmountStr = String(
+        item.amount || item.Amount || item.AMOUNT || 
+        item.paid || item.Paid || item.spent || item.Spent || 
+        item.received || item.Received || item.value || item.Value || '0'
+      );
+      // Remove all characters except numbers, decimal point, and negative sign
+      const cleanAmountStr = rawAmountStr.replace(/[^0-9.-]/g, '');
+      const cleanAmount = parseFloat(cleanAmountStr) || 0;
 
-      // Source / Category
-      const sourceOrCategory = item.source || item.Source || item.category || item.Category || item['Source/Category'] || '';
+      // Source / Category: Expand to common accountant terms
+      const sourceOrCategory = 
+        item.source || item.Source || item.category || item.Category || 
+        item['Source/Category'] || item.particulars || item.Particulars || 
+        item.particular || item.Particular || item.Type || item.type || '';
 
-      // Notes / Description
-      const notesOrDesc = item.notes || item.Notes || item.description || item.Description || item.memo || '';
+      // Notes / Description: Expand to remarks, comments, etc.
+      const notesOrDesc = 
+        item.notes || item.Notes || item.description || item.Description || 
+        item.memo || item.remarks || item.Remarks || item.remark || 
+        item.Comment || item.comment || item.details || '';
 
       // Fallbacks to null to prevent "undefined" error in bind parameters
       const sqlDate = normalizedDate || null;
