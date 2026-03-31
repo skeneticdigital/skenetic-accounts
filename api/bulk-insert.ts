@@ -2,6 +2,24 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import pool, { initDB } from './_lib/db.js';
 import { verifyToken } from './_lib/auth.js';
 
+// --- Helper for Fuzzy Field Mapping ---
+function findValue(obj: any, keywords: string[]): any {
+  const objKeys = Object.keys(obj);
+  // 1st pass: Exact match (case insensitive)
+  for (const k of objKeys) {
+    const lowerK = k.toLowerCase().trim();
+    if (keywords.some(kw => lowerK === kw.toLowerCase())) return obj[k];
+  }
+  // 2nd pass: Includes match (ignoring spaces/special chars)
+  for (const k of objKeys) {
+    const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (keywords.some(kw => cleanK.includes(kw.toLowerCase()) || kw.toLowerCase().includes(cleanK))) {
+      return obj[k];
+    }
+  }
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
@@ -25,40 +43,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // --- Flexible Field Mapping ---
       // Date: Look for variations of Date
-      let normalizedDate = item.date || item.Date || item.DATE || item.Data || item.data || item.DATA;
-      if (normalizedDate && typeof normalizedDate === 'string' && (normalizedDate.includes('.') || normalizedDate.includes('/') || normalizedDate.includes('-'))) {
-        const separator = normalizedDate.includes('.') ? '.' : (normalizedDate.includes('/') ? '/' : '-');
-        const parts = normalizedDate.split(separator);
+      let normalizedDate = findValue(item, ['date', 'data', 'day', 'time', 'period']);
+      if (normalizedDate) {
+        let dateStr = String(normalizedDate).trim();
+        // Handle common separators: . / - or space
+        const separator = dateStr.includes('.') ? '.' : (dateStr.includes('/') ? '/' : (dateStr.includes('-') ? '-' : ' '));
+        const parts = dateStr.split(separator);
+        
         if (parts.length === 3) {
-          if (parts[2].length === 4) { // DD.MM.YYYY
-            normalizedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-          } else if (parts[0].length === 4) { // YYYY.MM.DD
-            normalizedDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+          // DD MM YYYY or YYYY MM DD
+          let day = parts[0];
+          let month = parts[1];
+          let year = parts[2];
+
+          if (day.length === 4) { // YYYY MM DD
+            normalizedDate = `${day}-${month.padStart(2, '0')}-${year.padStart(2, '0')}`;
+          } else { // DD MM YYYY
+            // Handle 2-digit years (assume 20xx)
+            if (year.length === 2) year = '20' + year;
+            // Handle 2-digit months (if it's text like 'Mar', this won't help much, but Date.parse handles that)
+            normalizedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        } else {
+          // Fallback for formats like "Mar 27, 2026"
+          const parsed = new Date(dateStr);
+          if (!isNaN(parsed.getTime())) {
+            normalizedDate = parsed.toISOString().split('T')[0];
           }
         }
       }
 
       // Amount: Handle currency symbols, commas, and various column names
-      const rawAmountStr = String(
-        item.amount || item.Amount || item.AMOUNT || 
-        item.paid || item.Paid || item.spent || item.Spent || 
-        item.received || item.Received || item.value || item.Value || '0'
-      );
+      const rawAmount = findValue(item, ['amount', 'amt', 'total', 'credit', 'debit', 'received', 'paid', 'spent', 'value', 'price']);
+      const rawAmountStr = String(rawAmount || '0');
+      
       // Remove all characters except numbers, decimal point, and negative sign
       const cleanAmountStr = rawAmountStr.replace(/[^0-9.-]/g, '');
       const cleanAmount = parseFloat(cleanAmountStr) || 0;
 
       // Source / Category: Expand to common accountant terms
-      const sourceOrCategory = 
-        item.source || item.Source || item.category || item.Category || 
-        item['Source/Category'] || item.particulars || item.Particulars || 
-        item.particular || item.Particular || item.Type || item.type || '';
+      const sourceOrCategory = findValue(item, ['source', 'category', 'particulars', 'particular', 'reason', 'type', 'mode', 'from', 'to']) || '';
 
       // Notes / Description: Expand to remarks, comments, etc.
-      const notesOrDesc = 
-        item.notes || item.Notes || item.description || item.Description || 
-        item.memo || item.remarks || item.Remarks || item.remark || 
-        item.Comment || item.comment || item.details || '';
+      const notesOrDesc = findValue(item, ['notes', 'description', 'desc', 'memo', 'remarks', 'remark', 'comment', 'details', 'narrative', 'info']) || '';
 
       // Fallbacks to null to prevent "undefined" error in bind parameters
       const sqlDate = normalizedDate || null;
