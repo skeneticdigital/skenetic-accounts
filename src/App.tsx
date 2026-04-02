@@ -683,16 +683,16 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="border-l-4 border-l-emerald-500">
-                  <p className="text-sm text-zinc-500 mb-1">Total Income</p>
-                  <h2 className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.totalIncome)}</h2>
+                  <p className="text-xs text-zinc-400 mb-0.5 uppercase tracking-wider">Income — {filterMonth} {filterYear}</p>
+                  <h2 className="text-2xl font-bold text-emerald-600">{formatCurrency(filteredSummary.totalIncome)}</h2>
                 </Card>
                 <Card className="border-l-4 border-l-rose-500">
-                  <p className="text-sm text-zinc-500 mb-1">Total Expenses</p>
-                  <h2 className="text-2xl font-bold text-rose-600">{formatCurrency(summary.totalExpenses)}</h2>
+                  <p className="text-xs text-zinc-400 mb-0.5 uppercase tracking-wider">Expenses — {filterMonth} {filterYear}</p>
+                  <h2 className="text-2xl font-bold text-rose-600">{formatCurrency(filteredSummary.totalExpenses)}</h2>
                 </Card>
                 <Card className="border-l-4 border-l-blue-500">
-                  <p className="text-sm text-zinc-500 mb-1">Current Balance</p>
-                  <h2 className="text-2xl font-bold text-blue-600">{formatCurrency(summary.balance)}</h2>
+                  <p className="text-xs text-zinc-400 mb-0.5 uppercase tracking-wider">Balance — {filterMonth} {filterYear}</p>
+                  <h2 className="text-2xl font-bold text-blue-600">{formatCurrency(filteredSummary.balance)}</h2>
                 </Card>
               </div>
 
@@ -755,7 +755,9 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                      {[...income, ...expenses].slice(0, 5).map((item: any, i) => (
+                      {[...filteredIncome, ...filteredExpenses]
+                        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .slice(0, 5).map((item: any, i) => (
                         <tr key={i} className="text-sm">
                           <td className="py-4">{formatDate(item.date)}</td>
                           <td className="py-4">{item.source || item.description}</td>
