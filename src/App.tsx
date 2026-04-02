@@ -23,7 +23,10 @@ import {
   Edit2,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Calculator,
+  BarChart2,
+  Delete
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -77,6 +80,136 @@ const Card = ({ children, className }: { children: React.ReactNode, className?: 
     {children}
   </div>
 );
+
+// --- Calculator Component ---
+
+function CalcDisplay() {
+  const [display, setDisplay] = React.useState('0');
+  const [prevValue, setPrevValue] = React.useState<string | null>(null);
+  const [operator, setOperator] = React.useState<string | null>(null);
+  const [waitingForOperand, setWaitingForOperand] = React.useState(false);
+  const [history, setHistory] = React.useState<string[]>([]);
+
+  const inputDigit = (digit: string) => {
+    if (waitingForOperand) {
+      setDisplay(digit);
+      setWaitingForOperand(false);
+    } else {
+      setDisplay(display === '0' ? digit : display + digit);
+    }
+  };
+
+  const inputDot = () => {
+    if (waitingForOperand) { setDisplay('0.'); setWaitingForOperand(false); return; }
+    if (!display.includes('.')) setDisplay(display + '.');
+  };
+
+  const handleOperator = (op: string) => {
+    const curr = parseFloat(display);
+    if (prevValue !== null && !waitingForOperand) {
+      const prev = parseFloat(prevValue);
+      let result = prev;
+      if (operator === '+') result = prev + curr;
+      else if (operator === '-') result = prev - curr;
+      else if (operator === '×') result = prev * curr;
+      else if (operator === '÷') result = curr !== 0 ? prev / curr : 0;
+      const res = parseFloat(result.toFixed(10)).toString();
+      setDisplay(res);
+      setPrevValue(res);
+    } else {
+      setPrevValue(display);
+    }
+    setOperator(op);
+    setWaitingForOperand(true);
+  };
+
+  const handleEquals = () => {
+    if (!operator || prevValue === null) return;
+    const curr = parseFloat(display);
+    const prev = parseFloat(prevValue);
+    let result = prev;
+    if (operator === '+') result = prev + curr;
+    else if (operator === '-') result = prev - curr;
+    else if (operator === '×') result = prev * curr;
+    else if (operator === '÷') result = curr !== 0 ? prev / curr : 0;
+    const res = parseFloat(result.toFixed(10)).toString();
+    setHistory(h => [`${prevValue} ${operator} ${display} = ${res}`, ...h.slice(0, 9)]);
+    setDisplay(res);
+    setPrevValue(null);
+    setOperator(null);
+    setWaitingForOperand(true);
+  };
+
+  const handleClear = () => { setDisplay('0'); setPrevValue(null); setOperator(null); setWaitingForOperand(false); };
+  const handleBackspace = () => { if (display.length > 1) setDisplay(display.slice(0, -1)); else setDisplay('0'); };
+  const handleToggleSign = () => setDisplay((parseFloat(display) * -1).toString());
+  const handlePercent = () => setDisplay((parseFloat(display) / 100).toString());
+
+  const btnBase = "h-14 rounded-2xl text-lg font-semibold transition-all active:scale-95 select-none";
+  const btnGray = `${btnBase} bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200`;
+  const btnOp = `${btnBase} bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20`;
+  const btnEq = `${btnBase} bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20`;
+  const btnDanger = `${btnBase} bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 text-rose-600`;
+
+  return (
+    <div className="flex flex-col md:flex-row gap-6 w-full max-w-2xl mx-auto">
+      {/* Calculator */}
+      <div className="w-full max-w-xs mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+        {/* Display */}
+        <div className="bg-zinc-900 dark:bg-black px-6 py-8">
+          <p className="text-zinc-400 text-sm h-5 text-right">
+            {prevValue && operator ? `${prevValue} ${operator}` : ''}
+          </p>
+          <p className="text-white text-4xl font-light text-right mt-1 break-all leading-tight">
+            {display.length > 12 ? parseFloat(display).toExponential(4) : display}
+          </p>
+        </div>
+        {/* Buttons */}
+        <div className="p-4 grid grid-cols-4 gap-2">
+          <button onClick={handleClear} className={`${btnDanger} col-span-1`}>AC</button>
+          <button onClick={handleToggleSign} className={btnGray}>+/-</button>
+          <button onClick={handlePercent} className={btnGray}>%</button>
+          <button onClick={() => handleOperator('÷')} className={cn(btnOp, operator === '÷' && waitingForOperand ? 'bg-blue-700' : '')}>÷</button>
+
+          {['7','8','9'].map(d => <button key={d} onClick={() => inputDigit(d)} className={btnGray}>{d}</button>)}
+          <button onClick={() => handleOperator('×')} className={cn(btnOp, operator === '×' && waitingForOperand ? 'bg-blue-700' : '')}>×</button>
+
+          {['4','5','6'].map(d => <button key={d} onClick={() => inputDigit(d)} className={btnGray}>{d}</button>)}
+          <button onClick={() => handleOperator('-')} className={cn(btnOp, operator === '-' && waitingForOperand ? 'bg-blue-700' : '')}>−</button>
+
+          {['1','2','3'].map(d => <button key={d} onClick={() => inputDigit(d)} className={btnGray}>{d}</button>)}
+          <button onClick={() => handleOperator('+')} className={cn(btnOp, operator === '+' && waitingForOperand ? 'bg-blue-700' : '')}>+</button>
+
+          <button onClick={handleBackspace} className={btnGray}>⌫</button>
+          <button onClick={() => inputDigit('0')} className={btnGray}>0</button>
+          <button onClick={inputDot} className={btnGray}>.</button>
+          <button onClick={handleEquals} className={btnEq}>=</button>
+        </div>
+      </div>
+
+      {/* History */}
+      <div className="flex-1 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">History</h3>
+          {history.length > 0 && (
+            <button onClick={() => setHistory([])} className="text-xs text-rose-500 hover:text-rose-700">Clear</button>
+          )}
+        </div>
+        {history.length === 0 ? (
+          <p className="text-sm text-zinc-400 text-center mt-8">No calculations yet</p>
+        ) : (
+          <div className="space-y-2">
+            {history.map((h, i) => (
+              <div key={i} className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 py-2">
+                {h}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // --- Main App ---
 
@@ -617,6 +750,8 @@ export default function App() {
               { id: 'income', label: 'Income', icon: TrendingUp },
               { id: 'expenses', label: 'Expenses', icon: TrendingDown },
               { id: 'reports', label: 'Reports', icon: FileText },
+              { id: 'finalreport', label: 'Final Report', icon: BarChart2 },
+              { id: 'calculator', label: 'Calculator', icon: Calculator },
               { id: 'upload', label: 'Bulk Upload', icon: Upload },
             ].map((item) => (
               <button
@@ -1087,6 +1222,140 @@ export default function App() {
                     </div>
                   </div>
                 </Card>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'finalreport' && (() => {
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const availableYears = [...new Set([
+              ...income.map(i => new Date(i.date).getFullYear()),
+              ...expenses.map(e => new Date(e.date).getFullYear())
+            ])].filter(y => !isNaN(y)).sort((a, b) => b - a);
+
+            const reportYear = filterYear === 'All' ? new Date().getFullYear().toString() : filterYear;
+
+            const monthlyReport = monthNames.map((month, idx) => {
+              const inc = income
+                .filter(i => { const d = new Date(i.date); return d.getFullYear().toString() === reportYear && d.getMonth() === idx; })
+                .reduce((sum, i) => sum + Number(i.amount || 0), 0);
+              const exp = expenses
+                .filter(e => { const d = new Date(e.date); return d.getFullYear().toString() === reportYear && d.getMonth() === idx; })
+                .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+              return { month, income: inc, expense: exp, profit: inc - exp };
+            });
+
+            const totalInc = monthlyReport.reduce((s, r) => s + r.income, 0);
+            const totalExp = monthlyReport.reduce((s, r) => s + r.expense, 0);
+            const totalProfit = totalInc - totalExp;
+
+            const exportFinalReportCSV = () => {
+              const rows = [
+                ...monthlyReport.map(r => ({ Month: r.month, Year: reportYear, Income: r.income.toFixed(2), Expense: r.expense.toFixed(2), Profit: r.profit.toFixed(2) })),
+                { Month: 'TOTAL', Year: reportYear, Income: totalInc.toFixed(2), Expense: totalExp.toFixed(2), Profit: totalProfit.toFixed(2) }
+              ];
+              const csv = Papa.unparse(rows);
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = `final-report-${reportYear}.csv`;
+              link.click();
+            };
+
+            return (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold">Final Report</h2>
+                    <p className="text-sm text-zinc-500 mt-1">Monthly Income, Expense &amp; Profit breakdown</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select 
+                      value={reportYear}
+                      onChange={(e) => setFilterYear(e.target.value)}
+                      className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {availableYears.length === 0 ? <option>{new Date().getFullYear()}</option> : availableYears.map(y => <option key={y}>{y}</option>)}
+                    </select>
+                    <button
+                      onClick={exportFinalReportCSV}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                      <Download size={18} />
+                      Download CSV
+                    </button>
+                  </div>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="border-l-4 border-l-emerald-500">
+                    <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">Total Income {reportYear}</p>
+                    <h2 className="text-2xl font-bold text-emerald-600">{formatCurrency(totalInc)}</h2>
+                  </Card>
+                  <Card className="border-l-4 border-l-rose-500">
+                    <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">Total Expenses {reportYear}</p>
+                    <h2 className="text-2xl font-bold text-rose-600">{formatCurrency(totalExp)}</h2>
+                  </Card>
+                  <Card className={`border-l-4 ${totalProfit >= 0 ? 'border-l-blue-500' : 'border-l-orange-500'}`}>
+                    <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">Net Profit {reportYear}</p>
+                    <h2 className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>{formatCurrency(totalProfit)}</h2>
+                  </Card>
+                </div>
+
+                {/* Monthly Table */}
+                <Card>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-sm text-zinc-500 border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="pb-4 font-medium">Month</th>
+                          <th className="pb-4 font-medium text-right">Income</th>
+                          <th className="pb-4 font-medium text-right">Expense</th>
+                          <th className="pb-4 font-medium text-right">Profit / Loss</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        {monthlyReport.map((row) => (
+                          <tr key={row.month} className={cn(
+                            "text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/50",
+                            row.income === 0 && row.expense === 0 ? "opacity-40" : ""
+                          )}>
+                            <td className="py-4 font-semibold">{row.month}</td>
+                            <td className="py-4 text-right text-emerald-600 font-medium">{row.income > 0 ? formatCurrency(row.income) : '—'}</td>
+                            <td className="py-4 text-right text-rose-600 font-medium">{row.expense > 0 ? formatCurrency(row.expense) : '—'}</td>
+                            <td className={cn("py-4 text-right font-bold", row.profit >= 0 ? "text-blue-600" : "text-orange-600")}>
+                              {row.income === 0 && row.expense === 0 ? '—' : (row.profit >= 0 ? '+' : '') + formatCurrency(row.profit)}
+                            </td>
+                          </tr>
+                        ))}
+                        {/* Total Row */}
+                        <tr className="text-sm font-bold border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-900/50">
+                          <td className="py-4 text-zinc-700 dark:text-zinc-300 uppercase tracking-wider text-xs">Total</td>
+                          <td className="py-4 text-right text-emerald-600">{formatCurrency(totalInc)}</td>
+                          <td className="py-4 text-right text-rose-600">{formatCurrency(totalExp)}</td>
+                          <td className={cn("py-4 text-right", totalProfit >= 0 ? "text-blue-600" : "text-orange-600")}>
+                            {(totalProfit >= 0 ? '+' : '')}{formatCurrency(totalProfit)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </motion.div>
+            );
+          })()}
+
+          {activeTab === 'calculator' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold">Calculator</h2>
+                <p className="text-sm text-zinc-500 mt-1">Quick financial calculations</p>
+              </div>
+              <div className="flex justify-center">
+                <div className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+                  <CalcDisplay />
+                </div>
               </div>
             </motion.div>
           )}
