@@ -105,8 +105,8 @@ export default function App() {
   const [editingItem, setEditingItem] = useState<any>(null);
 
   // Filter States
-  const [filterMonth, setFilterMonth] = useState('All');
-  const [filterYear, setFilterYear] = useState('2026');
+  const [filterMonth, setFilterMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [filteredIncome, setFilteredIncome] = useState<Income[]>([]);
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [filteredSummary, setFilteredSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0 });
