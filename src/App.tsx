@@ -247,7 +247,8 @@ export default function App() {
       data.amount = parsedAmount as any;
     }
     
-    const url = (modalType === 'income' || modalType === 'income') ? '/api/income' : '/api/expenses';
+    const apiPath = modalType === 'income' ? 'income' : 'expenses';
+    const url = `/api/${apiPath}`;
     const method = editingItem ? 'PUT' : 'POST';
     const body = editingItem ? { ...data, id: editingItem.id } : data;
 
@@ -332,11 +333,12 @@ export default function App() {
     );
   };
 
-  const handleDeleteItem = async (type: 'income' | 'expense', id: number) => {
+  const handleDeleteItem = async (type: 'income' | 'expense' | 'expenses', id: number) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
     
     try {
-      const res = await fetch(`/api/${type === 'income' ? 'income' : 'expenses'}?id=${id}`, {
+      const apiPath = (type === 'income') ? 'income' : 'expenses';
+      const res = await fetch(`/api/${apiPath}?id=${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -394,16 +396,29 @@ export default function App() {
     doc.save('skenetic-digital-report.pdf');
   };
 
-  const exportCSV = () => {
-    const data = [
-      ...income.map(i => ({ date: i.date, type: 'Income', category: i.source, amount: i.amount, notes: i.notes })),
-      ...expenses.map(e => ({ date: e.date, type: 'Expense', category: e.category, amount: e.amount, notes: e.description }))
-    ];
+  const exportCSV = (type?: 'income' | 'expense') => {
+    let data: any[] = [];
+    let fileName = 'skenetic-digital-report.csv';
+
+    if (type === 'income') {
+      data = income.map(i => ({ date: i.date, type: 'Income', source: i.source, amount: i.amount, notes: i.notes }));
+      fileName = 'income-data.csv';
+    } else if (type === 'expense') {
+      data = expenses.map(e => ({ date: e.date, type: 'Expense', category: e.category, amount: e.amount, notes: e.description }));
+      fileName = 'expenses-data.csv';
+    } else {
+      data = [
+        ...income.map(i => ({ date: i.date, type: 'Income', category: i.source, amount: i.amount, notes: i.notes })),
+        ...expenses.map(e => ({ date: e.date, type: 'Expense', category: e.category, amount: e.amount, notes: e.description }))
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      fileName = 'financial-report-all.csv';
+    }
+
     const csv = Papa.unparse(data);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'fintrack-data.csv';
+    link.download = fileName;
     link.click();
   };
 
@@ -752,18 +767,27 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h2 className="text-2xl font-bold capitalize">{activeTab} Management</h2>
-                <button 
-                  onClick={() => {
-                    setModalType(activeTab.endsWith('s') ? activeTab.slice(0, -1) as 'income' | 'expense' : activeTab as 'income' | 'expense');
-                    setEditingItem(null);
-                    setError(null);
-                    setIsModalOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                >
-                  <Plus size={18} />
-                  Add New {activeTab === 'income' ? 'Income' : 'Expense'}
-                </button>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => exportCSV(activeTab === 'income' ? 'income' : 'expense')}
+                    className="flex items-center justify-center gap-2 px-4 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all"
+                  >
+                    <Download size={18} />
+                    Export CSV
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setModalType(activeTab.endsWith('s') ? activeTab.slice(0, -1) as 'income' | 'expense' : activeTab as 'income' | 'expense');
+                      setEditingItem(null);
+                      setError(null);
+                      setIsModalOpen(true);
+                    }}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                  >
+                    <Plus size={18} />
+                    Add New {activeTab === 'income' ? 'Income' : 'Expense'}
+                  </button>
+                </div>
               </div>
 
               <Card>

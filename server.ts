@@ -160,7 +160,8 @@ async function startServer() {
 
   app.delete('/api/income', authenticateToken, async (req: any, res) => {
     try {
-      const { id } = req.query;
+      const id = parseInt(req.query.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: 'Invalid ID' });
       await pool.execute('DELETE FROM income WHERE id = ? AND userId = ?', [id, req.user.id]);
       res.json({ message: 'Deleted' });
     } catch (error) {
@@ -207,7 +208,8 @@ async function startServer() {
 
   app.delete('/api/expenses', authenticateToken, async (req: any, res) => {
     try {
-      const { id } = req.query;
+      const id = parseInt(req.query.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: 'Invalid ID' });
       await pool.execute('DELETE FROM expenses WHERE id = ? AND userId = ?', [id, req.user.id]);
       res.json({ message: 'Deleted' });
     } catch (error) {
@@ -232,18 +234,45 @@ async function startServer() {
       let successCount = 0;
       for (const item of data) {
         try {
-          // Robust date parsing (Handles DD.MM.YYYY, DD/MM/YYYY, etc.)
-          let normalizedDate = item.date;
-          if (normalizedDate && (normalizedDate.includes('.') || normalizedDate.includes('/'))) {
-            const separator = normalizedDate.includes('.') ? '.' : '/';
+          // Robust date parsing
+          let normalizedDate = item.date ? String(item.date).trim() : '';
+          if (normalizedDate) {
+            // Handle various separators: . / - or space
+            const separator = normalizedDate.includes('.') ? '.' : (normalizedDate.includes('/') ? '/' : (normalizedDate.includes('-') ? '-' : ' '));
             const parts = normalizedDate.split(separator);
+            
             if (parts.length === 3) {
-              // Assume DD.MM.YYYY if parts[2] is length 4
-              if (parts[2].length === 4) {
-                normalizedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-              } else if (parts[0].length === 4) {
-                // Already YYYY.MM.DD
-                normalizedDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+              let p1 = parts[0].replace(/[^0-9]/g, '');
+              let p2 = parts[1].replace(/[^0-9]/g, '');
+              let p3 = parts[2].replace(/[^0-9]/g, '');
+
+              // Case: YYYY MM DD (e.g., 2026-03-27)
+              if (p1.length === 4) {
+                normalizedDate = `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+              } 
+              // Case: DD MM YYYY or DD MM YY (e.g., 27.03.2026 or 27/03/26)
+              else if (p3.length >= 2 && !isNaN(parseInt(p1)) && !isNaN(parseInt(p2))) {
+                let year = p3;
+                if (year.length === 2) year = '20' + year;
+                normalizedDate = `${year}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+              } else {
+                // Fallback for native Date parsing (e.g., "Mar 27, 2026")
+                const parsed = new Date(normalizedDate);
+                if (!isNaN(parsed.getTime())) {
+                  const y = parsed.getFullYear();
+                  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                  const d = String(parsed.getDate()).padStart(2, '0');
+                  normalizedDate = `${y}-${m}-${d}`;
+                }
+              }
+            } else {
+              // Fallback for native Date parsing
+              const parsed = new Date(normalizedDate);
+              if (!isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                normalizedDate = `${y}-${m}-${d}`;
               }
             }
           }

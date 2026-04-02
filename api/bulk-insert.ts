@@ -45,30 +45,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Date: Look for variations of Date
       let normalizedDate = findValue(item, ['date', 'data', 'day', 'time', 'period']);
       if (normalizedDate) {
-        let dateStr = String(normalizedDate).trim();
+        // Robust date parsing
+        let normalizedDateStr = String(normalizedDate).trim();
         // Handle common separators: . / - or space
-        const separator = dateStr.includes('.') ? '.' : (dateStr.includes('/') ? '/' : (dateStr.includes('-') ? '-' : ' '));
-        const parts = dateStr.split(separator);
+        const separator = normalizedDateStr.includes('.') ? '.' : (normalizedDateStr.includes('/') ? '/' : (normalizedDateStr.includes('-') ? '-' : ' '));
+        const parts = normalizedDateStr.split(separator);
         
         if (parts.length === 3) {
-          // DD MM YYYY or YYYY MM DD
-          let day = parts[0];
-          let month = parts[1];
-          let year = parts[2];
+          let p1 = parts[0].replace(/[^0-9]/g, '');
+          let p2 = parts[1].replace(/[^0-9]/g, '');
+          let p3 = parts[2].replace(/[^0-9]/g, '');
 
-          if (day.length === 4) { // YYYY MM DD
-            normalizedDate = `${day}-${month.padStart(2, '0')}-${year.padStart(2, '0')}`;
-          } else { // DD MM YYYY
-            // Handle 2-digit years (assume 20xx)
+          if (p1.length === 4) { // YYYY MM DD
+            normalizedDate = `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+          } else if (p3.length >= 2 && !isNaN(parseInt(p1)) && !isNaN(parseInt(p2))) { // DD MM YYYY
+            let year = p3;
             if (year.length === 2) year = '20' + year;
-            // Handle 2-digit months (if it's text like 'Mar', this won't help much, but Date.parse handles that)
-            normalizedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            normalizedDate = `${year}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+          } else {
+            // Fallback for formats like "Mar 27, 2026"
+            const parsed = new Date(normalizedDateStr);
+            if (!isNaN(parsed.getTime())) {
+              const y = parsed.getFullYear();
+              const m = String(parsed.getMonth() + 1).padStart(2, '0');
+              const d = String(parsed.getDate()).padStart(2, '0');
+              normalizedDate = `${y}-${m}-${d}`;
+            }
           }
         } else {
           // Fallback for formats like "Mar 27, 2026"
-          const parsed = new Date(dateStr);
+          const parsed = new Date(normalizedDateStr);
           if (!isNaN(parsed.getTime())) {
-            normalizedDate = parsed.toISOString().split('T')[0];
+            const y = parsed.getFullYear();
+            const m = String(parsed.getMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getDate()).padStart(2, '0');
+            normalizedDate = `${y}-${m}-${d}`;
           }
         }
       }
